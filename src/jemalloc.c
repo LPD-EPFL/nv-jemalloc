@@ -2107,6 +2107,13 @@ je_mallocx(size_t size, int flags)
 	return (p);
 }
 
+JEMALLOC_EXPORT JEMALLOC_ALLOCATOR JEMALLOC_RESTRICT_RETURN
+void JEMALLOC_NOTHROW *
+je_nextx(size_t size, int flags)
+{
+    return NULL;
+}
+
 static void *
 irallocx_prof_sample(tsdn_t *tsdn, extent_t *extent, void *old_ptr,
     size_t old_usize, size_t usize, size_t alignment, bool zero,
