@@ -75,7 +75,6 @@ tcache_alloc_small_hard(tsdn_t *tsdn, arena_t *arena, tcache_t *tcache,
     tcache_bin_t *tbin, szind_t binind, bool *tcache_success)
 {
 	void *ret;
-    fprintf(stderr, "tcache alloc small hard\n");
 
 	arena_tcache_fill_small(tsdn, arena, tbin, binind, config_prof ?
 	    tcache->prof_accumbytes : 0);
@@ -92,7 +91,6 @@ tcache_next_small_hard(tsdn_t *tsdn, arena_t *arena, tcache_t *tcache,
     tcache_bin_t *tbin, szind_t binind, bool *tcache_success)
 {
 	void *ret;
-    fprintf(stderr, "tcache alloc small hard\n");
 
 	arena_tcache_fill_small(tsdn, arena, tbin, binind, config_prof ?
 	    tcache->prof_accumbytes : 0);

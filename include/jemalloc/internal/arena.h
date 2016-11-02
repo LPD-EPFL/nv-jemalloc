@@ -351,6 +351,8 @@ void	arena_decay_ticks(tsdn_t *tsdn, arena_t *arena, unsigned nticks);
 void	arena_decay_tick(tsdn_t *tsdn, arena_t *arena);
 void	*arena_malloc(tsdn_t *tsdn, arena_t *arena, size_t size, szind_t ind,
     bool zero, tcache_t *tcache, bool slow_path);
+void	*arena_next(tsdn_t *tsdn, arena_t *arena, size_t size, szind_t ind,
+    bool zero, tcache_t *tcache, bool slow_path);
 arena_t	*arena_aalloc(tsdn_t *tsdn, const void *ptr);
 size_t	arena_salloc(tsdn_t *tsdn, const extent_t *extent, const void *ptr);
 void	arena_dalloc(tsdn_t *tsdn, extent_t *extent, void *ptr,
@@ -520,6 +522,26 @@ arena_malloc(tsdn_t *tsdn, arena_t *arena, size_t size, szind_t ind, bool zero,
 	}
 
 	return (arena_malloc_hard(tsdn, arena, size, ind, zero));
+}
+
+
+JEMALLOC_ALWAYS_INLINE void *
+arena_next(tsdn_t *tsdn, arena_t *arena, size_t size, szind_t ind, bool zero,
+    tcache_t *tcache, bool slow_path)
+{
+
+	assert(!tsdn_null(tsdn) || tcache == NULL);
+	assert(size != 0);
+    assert(size <= SMALL_MAXCLASS); //next is supported only for small objects (for now)
+
+	if (likely(tcache != NULL)) {
+		if (likely(size <= SMALL_MAXCLASS)) {
+			return (tcache_next_small(tsdn_tsd(tsdn), arena,
+			    tcache, size, ind, zero, slow_path));
+		}
+	}
+
+    return NULL;
 }
 
 JEMALLOC_ALWAYS_INLINE arena_t *

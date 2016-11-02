@@ -2047,12 +2047,38 @@ imallocx_no_prof(tsd_t *tsd, size_t size, int flags, size_t *usize,
 
 /* This function guarantees that *tsdn is non-NULL on success. */
 JEMALLOC_ALWAYS_INLINE_C void *
+inextx_body(size_t size, int flags, tsdn_t **tsdn, size_t *usize,
+    bool slow_path)
+{
+	tsd_t *tsd;
+
+	if (slow_path && unlikely(malloc_init())) {
+		*tsdn = NULL;
+		return (NULL);
+	}
+
+	tsd = tsd_fetch();
+	*tsdn = tsd_tsdn(tsd);
+	witness_assert_lockless(tsd_tsdn(tsd));
+
+	if (likely(flags == 0)) {
+		szind_t ind = size2index(size);
+		if (unlikely(ind >= NSIZES))
+			return (NULL);
+
+		return (inext(tsd, size, ind, false, slow_path));
+	}
+    return NULL;
+
+}
+
+/* This function guarantees that *tsdn is non-NULL on success. */
+JEMALLOC_ALWAYS_INLINE_C void *
 imallocx_body(size_t size, int flags, tsdn_t **tsdn, size_t *usize,
     bool slow_path)
 {
 	tsd_t *tsd;
 
-    fprintf(stderr, "imallocx body\n");
 	if (slow_path && unlikely(malloc_init())) {
 		*tsdn = NULL;
 		return (NULL);
@@ -2085,6 +2111,7 @@ imallocx_body(size_t size, int flags, tsdn_t **tsdn, size_t *usize,
 	return (imallocx_no_prof(tsd, size, flags, usize, slow_path));
 }
 
+
 JEMALLOC_EXPORT JEMALLOC_ALLOCATOR JEMALLOC_RESTRICT_RETURN
 void JEMALLOC_NOTHROW *
 JEMALLOC_ATTR(malloc) JEMALLOC_ALLOC_SIZE(1)
@@ -2112,7 +2139,23 @@ JEMALLOC_EXPORT JEMALLOC_ALLOCATOR JEMALLOC_RESTRICT_RETURN
 void JEMALLOC_NOTHROW *
 je_nextx(size_t size, int flags)
 {
-    return NULL;
+
+	tsdn_t *tsdn;
+	void *p;
+	size_t usize;
+
+	assert(size != 0);
+
+	if (likely(!malloc_slow)) {
+		p = inextx_body(size, flags, &tsdn, &usize, false);
+		/*ialloc_post_check(p, tsdn, usize, "mallocx", false, false);*/
+	} else {
+		p = inextx_body(size, flags, &tsdn, &usize, true); //TODO does this work is slow = true
+		/*ialloc_post_check(p, tsdn, usize, "mallocx", false, true);*/
+		UTRACE(0, size, p);
+	}
+
+	return (p);
 }
 
 static void *

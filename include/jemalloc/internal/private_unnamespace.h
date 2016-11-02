@@ -35,6 +35,7 @@
 #undef arena_ichoose
 #undef arena_init
 #undef arena_malloc
+#undef arena_next
 #undef arena_malloc_hard
 #undef arena_maybe_purge
 #undef arena_metadata_add
@@ -213,7 +214,9 @@
 #undef hash_x86_32
 #undef iaalloc
 #undef ialloc
+#undef inext
 #undef iallocztm
+#undef inextztm
 #undef iarena_cleanup
 #undef idalloc
 #undef idalloctm

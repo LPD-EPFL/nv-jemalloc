@@ -954,7 +954,11 @@ arena_t	*iaalloc(tsdn_t *tsdn, const void *ptr);
 size_t	isalloc(tsdn_t *tsdn, const extent_t *extent, const void *ptr);
 void	*iallocztm(tsdn_t *tsdn, size_t size, szind_t ind, bool zero,
     tcache_t *tcache, bool is_metadata, arena_t *arena, bool slow_path);
+void	*inextztm(tsdn_t *tsdn, size_t size, szind_t ind, bool zero,
+    tcache_t *tcache, bool is_metadata, arena_t *arena, bool slow_path);
 void	*ialloc(tsd_t *tsd, size_t size, szind_t ind, bool zero,
+    bool slow_path);
+void	*inext(tsd_t *tsd, size_t size, szind_t ind, bool zero,
     bool slow_path);
 void	*ipallocztm(tsdn_t *tsdn, size_t usize, size_t alignment, bool zero,
     tcache_t *tcache, bool is_metadata, arena_t *arena);
@@ -1005,6 +1009,20 @@ isalloc(tsdn_t *tsdn, const extent_t *extent, const void *ptr)
 }
 
 JEMALLOC_ALWAYS_INLINE void *
+inextztm(tsdn_t *tsdn, size_t size, szind_t ind, bool zero, tcache_t *tcache,
+    bool is_metadata, arena_t *arena, bool slow_path)
+{
+	void *ret;
+
+	assert(size != 0);
+	assert(!is_metadata || tcache == NULL);
+	assert(!is_metadata || arena == NULL || arena->ind < narenas_auto);
+
+	ret = arena_malloc(tsdn, arena, size, ind, zero, tcache, slow_path);
+	return (ret);
+}
+
+JEMALLOC_ALWAYS_INLINE void *
 iallocztm(tsdn_t *tsdn, size_t size, szind_t ind, bool zero, tcache_t *tcache,
     bool is_metadata, arena_t *arena, bool slow_path)
 {
@@ -1027,6 +1045,14 @@ ialloc(tsd_t *tsd, size_t size, szind_t ind, bool zero, bool slow_path)
 {
 
 	return (iallocztm(tsd_tsdn(tsd), size, ind, zero, tcache_get(tsd, true),
+	    false, NULL, slow_path));
+}
+
+JEMALLOC_ALWAYS_INLINE void *
+inext(tsd_t *tsd, size_t size, szind_t ind, bool zero, bool slow_path)
+{
+
+	return (inextztm(tsd_tsdn(tsd), size, ind, zero, tcache_get(tsd, true),
 	    false, NULL, slow_path));
 }
 
