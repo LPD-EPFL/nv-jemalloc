@@ -422,9 +422,12 @@
 #undef size2index_tab
 #undef stats_print
 #undef tcache_alloc_easy
+#undef tcache_next_easy
 #undef tcache_alloc_large
 #undef tcache_alloc_small
+#undef tcache_next_small
 #undef tcache_alloc_small_hard
+#undef tcache_next_small_hard
 #undef tcache_arena_reassociate
 #undef tcache_bin_flush_large
 #undef tcache_bin_flush_small

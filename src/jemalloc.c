@@ -2052,6 +2052,7 @@ imallocx_body(size_t size, int flags, tsdn_t **tsdn, size_t *usize,
 {
 	tsd_t *tsd;
 
+    fprintf(stderr, "imallocx body\n");
 	if (slow_path && unlikely(malloc_init())) {
 		*tsdn = NULL;
 		return (NULL);

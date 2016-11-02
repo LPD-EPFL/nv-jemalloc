@@ -422,9 +422,12 @@ size2index_lookup
 size2index_tab
 stats_print
 tcache_alloc_easy
+tcache_next_easy
 tcache_alloc_large
 tcache_alloc_small
+tcache_next_small
 tcache_alloc_small_hard
+tcache_next_small_hard
 tcache_arena_reassociate
 tcache_bin_flush_large
 tcache_bin_flush_small

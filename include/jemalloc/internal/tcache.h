@@ -134,6 +134,9 @@ size_t	tcache_salloc(tsdn_t *tsdn, const void *ptr);
 void	tcache_event_hard(tsd_t *tsd, tcache_t *tcache);
 void	*tcache_alloc_small_hard(tsdn_t *tsdn, arena_t *arena, tcache_t *tcache,
     tcache_bin_t *tbin, szind_t binind, bool *tcache_success);
+
+void	*tcache_next_small_hard(tsdn_t *tsdn, arena_t *arena, tcache_t *tcache,
+    tcache_bin_t *tbin, szind_t binind, bool *tcache_success);
 void	tcache_bin_flush_small(tsd_t *tsd, tcache_t *tcache, tcache_bin_t *tbin,
     szind_t binind, unsigned rem);
 void	tcache_bin_flush_large(tsd_t *tsd, tcache_bin_t *tbin, szind_t binind,
@@ -160,8 +163,13 @@ bool	tcache_enabled_get(void);
 tcache_t *tcache_get(tsd_t *tsd, bool create);
 void	tcache_enabled_set(bool enabled);
 void	*tcache_alloc_easy(tcache_bin_t *tbin, bool *tcache_success);
+void	*tcache_next_easy(tcache_bin_t *tbin, bool *tcache_success);
 void	*tcache_alloc_small(tsd_t *tsd, arena_t *arena, tcache_t *tcache,
     size_t size, szind_t ind, bool zero, bool slow_path);
+
+void	*tcache_next_small(tsd_t *tsd, arena_t *arena, tcache_t *tcache,
+    size_t size, szind_t ind, bool zero, bool slow_path);
+
 void	*tcache_alloc_large(tsd_t *tsd, arena_t *arena, tcache_t *tcache,
     size_t size, szind_t ind, bool zero, bool slow_path);
 void	tcache_dalloc_small(tsd_t *tsd, tcache_t *tcache, void *ptr,
@@ -249,6 +257,33 @@ tcache_event(tsd_t *tsd, tcache_t *tcache)
 }
 
 JEMALLOC_ALWAYS_INLINE void *
+tcache_next_easy(tcache_bin_t *tbin, bool *tcache_success)
+{
+	void *ret;
+
+	if (unlikely(tbin->ncached == 0)) {
+		tbin->low_water = -1;
+		*tcache_success = false;
+		return (NULL);
+	}
+	/*
+	 * tcache_success (instead of ret) should be checked upon the return of
+	 * this function.  We avoid checking (ret == NULL) because there is
+	 * never a null stored on the avail stack (which is unknown to the
+	 * compiler), and eagerly checking ret would cause pipeline stall
+	 * (waiting for the cacheline).
+	 */
+	*tcache_success = true;
+	ret = *(tbin->avail - tbin->ncached);
+	//tbin->ncached--;
+
+	if (unlikely((int)tbin->ncached < tbin->low_water))
+		tbin->low_water = tbin->ncached;
+
+	return (ret);
+}
+
+JEMALLOC_ALWAYS_INLINE void *
 tcache_alloc_easy(tcache_bin_t *tbin, bool *tcache_success)
 {
 	void *ret;
@@ -271,6 +306,36 @@ tcache_alloc_easy(tcache_bin_t *tbin, bool *tcache_success)
 
 	if (unlikely((int)tbin->ncached < tbin->low_water))
 		tbin->low_water = tbin->ncached;
+
+	return (ret);
+}
+
+JEMALLOC_ALWAYS_INLINE void *
+tcache_next_small(tsd_t *tsd, arena_t *arena, tcache_t *tcache, size_t size,
+    szind_t binind, bool zero, bool slow_path)
+{
+	void *ret;
+	tcache_bin_t *tbin;
+	bool tcache_success;
+	size_t usize JEMALLOC_CC_SILENCE_INIT(0);
+
+	assert(binind < NBINS);
+	tbin = &tcache->tbins[binind];
+	ret = tcache_next_easy(tbin, &tcache_success);
+	assert(tcache_success == (ret != NULL));
+	if (unlikely(!tcache_success)) {
+		bool tcache_hard_success;
+		arena = arena_choose(tsd, arena);
+		if (unlikely(arena == NULL))
+			return (NULL);
+
+		ret = tcache_next_small_hard(tsd_tsdn(tsd), arena, tcache,
+		    tbin, binind, &tcache_hard_success);
+		if (tcache_hard_success == false)
+			return (NULL);
+	}
+
+	assert(ret);
 
 	return (ret);
 }
