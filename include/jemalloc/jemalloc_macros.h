@@ -4,12 +4,12 @@
 #include <limits.h>
 #include <strings.h>
 
-#define	JEMALLOC_VERSION "4.2.0-148-g0ba5b9b6189e16a983d8922d8c5cb6ab421906e8"
+#define	JEMALLOC_VERSION "4.2.0-151-gcaada8ae0cffea1b8e987b7dda27fb9e22e0b8b2"
 #define	JEMALLOC_VERSION_MAJOR 4
 #define	JEMALLOC_VERSION_MINOR 2
 #define	JEMALLOC_VERSION_BUGFIX 0
-#define	JEMALLOC_VERSION_NREV 148
-#define	JEMALLOC_VERSION_GID "0ba5b9b6189e16a983d8922d8c5cb6ab421906e8"
+#define	JEMALLOC_VERSION_NREV 151
+#define	JEMALLOC_VERSION_GID "caada8ae0cffea1b8e987b7dda27fb9e22e0b8b2"
 
 #  define MALLOCX_LG_ALIGN(la)	((int)(la))
 #  if LG_SIZEOF_PTR == 2

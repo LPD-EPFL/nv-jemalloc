@@ -56,29 +56,29 @@ extern "C" {
  * these macro definitions.
  */
 #ifndef JEMALLOC_NO_RENAME
-#  define je_malloc_conf malloc_conf
-#  define je_malloc_message malloc_message
-#  define je_malloc malloc
-#  define je_calloc calloc
-#  define je_posix_memalign posix_memalign
-#  define je_aligned_alloc aligned_alloc
-#  define je_realloc realloc
-#  define je_free free
-#  define je_mallocx mallocx
-#  define je_nextx nextx
-#  define je_rallocx rallocx
-#  define je_xallocx xallocx
-#  define je_sallocx sallocx
-#  define je_dallocx dallocx
-#  define je_sdallocx sdallocx
-#  define je_nallocx nallocx
-#  define je_mallctl mallctl
-#  define je_mallctlnametomib mallctlnametomib
-#  define je_mallctlbymib mallctlbymib
-#  define je_malloc_stats_print malloc_stats_print
-#  define je_malloc_usable_size malloc_usable_size
-#  define je_memalign memalign
-#  define je_valloc valloc
+#  define je_malloc_conf nv_malloc_conf
+#  define je_malloc_message nv_malloc_message
+#  define je_malloc nv_malloc
+#  define je_calloc nv_calloc
+#  define je_posix_memalign nv_posix_memalign
+#  define je_aligned_alloc nv_aligned_alloc
+#  define je_realloc nv_realloc
+#  define je_free nv_free
+#  define je_mallocx nv_mallocx
+#  define je_nextx nv_nextx
+#  define je_rallocx nv_rallocx
+#  define je_xallocx nv_xallocx
+#  define je_sallocx nv_sallocx
+#  define je_dallocx nv_dallocx
+#  define je_sdallocx nv_sdallocx
+#  define je_nallocx nv_nallocx
+#  define je_mallctl nv_mallctl
+#  define je_mallctlnametomib nv_mallctlnametomib
+#  define je_mallctlbymib nv_mallctlbymib
+#  define je_malloc_stats_print nv_malloc_stats_print
+#  define je_malloc_usable_size nv_malloc_usable_size
+#  define je_memalign nv_memalign
+#  define je_valloc nv_valloc
 #endif
 
 #include <stdlib.h>
@@ -87,12 +87,12 @@ extern "C" {
 #include <limits.h>
 #include <strings.h>
 
-#define	JEMALLOC_VERSION "4.2.0-148-g0ba5b9b6189e16a983d8922d8c5cb6ab421906e8"
+#define	JEMALLOC_VERSION "4.2.0-151-gcaada8ae0cffea1b8e987b7dda27fb9e22e0b8b2"
 #define	JEMALLOC_VERSION_MAJOR 4
 #define	JEMALLOC_VERSION_MINOR 2
 #define	JEMALLOC_VERSION_BUGFIX 0
-#define	JEMALLOC_VERSION_NREV 148
-#define	JEMALLOC_VERSION_GID "0ba5b9b6189e16a983d8922d8c5cb6ab421906e8"
+#define	JEMALLOC_VERSION_NREV 151
+#define	JEMALLOC_VERSION_GID "caada8ae0cffea1b8e987b7dda27fb9e22e0b8b2"
 
 #  define MALLOCX_LG_ALIGN(la)	((int)(la))
 #  if LG_SIZEOF_PTR == 2
@@ -215,6 +215,10 @@ JEMALLOC_EXPORT void JEMALLOC_NOTHROW	je_free(void *ptr)
 JEMALLOC_EXPORT JEMALLOC_ALLOCATOR JEMALLOC_RESTRICT_RETURN
     void JEMALLOC_NOTHROW	*je_mallocx(size_t size, int flags)
     JEMALLOC_ATTR(malloc) JEMALLOC_ALLOC_SIZE(1);
+
+JEMALLOC_EXPORT JEMALLOC_ALLOCATOR JEMALLOC_RESTRICT_RETURN
+    void JEMALLOC_NOTHROW    *je_nextx(size_t size, int flags);
+
 JEMALLOC_EXPORT JEMALLOC_ALLOCATOR JEMALLOC_RESTRICT_RETURN
     void JEMALLOC_NOTHROW	*je_rallocx(void *ptr, size_t size,
     int flags) JEMALLOC_ALLOC_SIZE(2);
@@ -227,9 +231,6 @@ JEMALLOC_EXPORT void JEMALLOC_NOTHROW	je_sdallocx(void *ptr, size_t size,
     int flags);
 JEMALLOC_EXPORT size_t JEMALLOC_NOTHROW	je_nallocx(size_t size, int flags)
     JEMALLOC_ATTR(pure);
-
-JEMALLOC_EXPORT JEMALLOC_ALLOCATOR JEMALLOC_RESTRICT_RETURN
-    void JEMALLOC_NOTHROW	*je_nextx(size_t size, int flags);
 
 JEMALLOC_EXPORT int JEMALLOC_NOTHROW	je_mallctl(const char *name,
     void *oldp, size_t *oldlenp, void *newp, size_t newlen);

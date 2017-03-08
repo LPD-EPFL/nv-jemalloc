@@ -18,6 +18,7 @@
 #  define realloc jet_realloc
 #  define free jet_free
 #  define mallocx jet_mallocx
+#  define nextx jet_nextx
 #  define rallocx jet_rallocx
 #  define xallocx jet_xallocx
 #  define sallocx jet_sallocx
@@ -50,6 +51,7 @@
 #  undef jet_realloc
 #  undef jet_free
 #  undef jet_mallocx
+#  undef jet_nextx
 #  undef jet_rallocx
 #  undef jet_xallocx
 #  undef jet_sallocx
