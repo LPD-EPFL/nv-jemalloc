@@ -1013,6 +1013,7 @@ inextztm(tsdn_t *tsdn, size_t size, szind_t ind, bool zero, tcache_t *tcache,
     bool is_metadata, arena_t *arena, bool slow_path)
 {
 	void *ret;
+
 	assert(size != 0);
 	assert(!is_metadata || tcache == NULL);
 	assert(!is_metadata || arena == NULL || arena->ind < narenas_auto);

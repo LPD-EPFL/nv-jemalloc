@@ -635,7 +635,7 @@ AC_ARG_WITH([jemalloc_prefix],
   [AS_HELP_STRING([--with-jemalloc-prefix=<prefix>], [Prefix to prepend to all public APIs])],
   [JEMALLOC_PREFIX="$with_jemalloc_prefix"],
   [if test "x$abi" != "xmacho" -a "x$abi" != "xpecoff"; then
-  JEMALLOC_PREFIX=""
+  JEMALLOC_PREFIX="nv_"
 else
   JEMALLOC_PREFIX="je_"
 fi]
