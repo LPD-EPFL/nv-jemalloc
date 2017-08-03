@@ -1,6 +1,8 @@
 #define	JEMALLOC_TCACHE_C_
 #include "jemalloc/internal/jemalloc_internal.h"
 
+
+
 /******************************************************************************/
 /* Data. */
 
@@ -175,8 +177,13 @@ tcache_bin_flush_small(tsd_t *tsd, tcache_t *tcache, tcache_bin_t *tbin,
 	memmove(tbin->avail - rem, tbin->avail - tbin->ncached, rem *
 	    sizeof(void *));
 	tbin->ncached = rem;
-	if ((int)tbin->ncached < tbin->low_water)
+
+	write_data_nowait((void*)(tbin->avail - tbin->ncached), 1);
+    write_data_nowait((void*)&(tbin->ncached), 1);
+	if ((int)tbin->ncached < tbin->low_water) {
 		tbin->low_water = tbin->ncached;
+    write_data_nowait((void*)&(tbin->low_water), 1);
+    }
 }
 
 void
@@ -258,8 +265,13 @@ tcache_bin_flush_large(tsd_t *tsd, tcache_bin_t *tbin, szind_t binind,
 	memmove(tbin->avail - rem, tbin->avail - tbin->ncached, rem *
 	    sizeof(void *));
 	tbin->ncached = rem;
-	if ((int)tbin->ncached < tbin->low_water)
+
+	write_data_nowait((void*)(tbin->avail - tbin->ncached), 1);
+    write_data_nowait((void*)&(tbin->ncached), 1);
+	if ((int)tbin->ncached < tbin->low_water) {
 		tbin->low_water = tbin->ncached;
+    write_data_nowait((void*)&(tbin->low_water), 1);
+    }
 }
 
 static void

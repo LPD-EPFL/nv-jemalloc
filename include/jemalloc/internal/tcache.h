@@ -180,6 +180,155 @@ tcache_t	*tcaches_get(tsd_t *tsd, unsigned ind);
 #endif
 
 #if (defined(JEMALLOC_ENABLE_INLINE) || defined(JEMALLOC_TCACHE_C_))
+
+
+#define SIMULATE_LATENCIES 1
+
+#define WAIT_WRITES_DELAY 370
+#define WRITE_DATA_WAIT_DELAY 370
+#define WRITE_DATA_NOWAIT_DELAY 9
+
+
+#ifndef CACHE_LINE_SIZE
+#define CACHE_LINE_SIZE 64
+#endif
+
+#define CACHE_ALIGNED __attribute__ ((aligned(CACHE_LINE_SIZE)))
+
+
+#ifndef EPOCH_CACHE_LINE_SIZE
+#define EPOCH_CACHE_LINE_SIZE 64
+#endif
+
+#define EPOCH_CACHE_ALIGNED __attribute__ ((aligned(EPOCH_CACHE_LINE_SIZE)))
+
+#if !defined(UNUSED)
+#define UNUSED __attribute__ ((unused))
+#endif
+
+#ifdef __SSE__
+#include <xmmintrin.h>
+#endif
+
+#include <stdint.h>
+
+typedef uint64_t ticks;
+
+
+static inline ticks
+nv_getticks(void)
+{
+  unsigned hi, lo;
+  __asm__ __volatile__ ("rdtsc" : "=a"(lo), "=d"(hi));
+  return ( (unsigned long long)lo)|( ((unsigned long long)hi)<<32 );
+}
+
+/* contains functions for working with non-volatile memory */
+
+
+// TODO add operations to do moves from volatile memory to persistent memeory addresses using non-temporal stores
+// for examples, see https://github.com/pmem/nvml/blob/master/src/libpmem/pmem.c
+
+
+
+static inline size_t num_cache_lines(size_t size_bytes) {
+	if (size_bytes == 0) return 0;
+	return (((size_bytes - 1)/ CACHE_LINE_SIZE) + 1);
+}
+
+#ifdef NEW_INTEL_INSTRUCTIONS
+
+#define _mm_clflushopt(addr) asm volatile(".byte 0x66; clflush %0" : "+m" (*(volatile char *)addr));
+#define _mm_clwb(addr) asm volatile(".byte 0x66; xsaveopt %0" : "+m" (*(volatile char *)addr));
+
+static inline void wait_writes() {
+	_mm_sfence();
+}
+
+static inline void write_data_nowait(void* addr, size_t sz) {
+	uintptr_t p;
+
+	for (p = (uintptr_t)adddr & ~(CACHE_LINE_SIZE - 1; p < (uintptr_t)addr + sz; p += CACHE_LINE_SIZE) {
+		_mm_clwb((void*)p);
+	}
+}
+
+static inline void write_data_wait(void* addr, size_t sz) {
+	uintptr_t p;
+
+		for (p = (uintptr_t)adddr & ~(CACHE_LINE_SIZE - 1; p < (uintptr_t)addr + sz; p += CACHE_LINE_SIZE) {
+			_mm_clwb((void*)p);
+		}
+	_mm_sfence();
+}
+
+#else
+
+#define _mm_clflushopt(addr) _mm_clflush(addr)
+#define _mm_clwb(addr) _mm_clflush(addr)
+
+
+static inline void wait_writes() {
+#ifdef SIMULATE_LATENCIES
+	uint64_t startCycles = nv_getticks();
+	uint64_t endCycles = startCycles + WAIT_WRITES_DELAY;
+	uint64_t cycles = startCycles;
+
+	while (cycles < endCycles) {
+		cycles = nv_getticks();
+	}
+	_mm_sfence();
+#else
+	//_mm_sfence();
+#endif
+}
+
+//size is in terms of number of cache lines
+static inline void write_data_wait(void* addr, size_t sz) {
+#ifdef SIMULATE_LATENCIES
+	uint64_t startCycles =nv_getticks();
+	uint64_t endCycles = startCycles + WRITE_DATA_WAIT_DELAY;
+	uint64_t cycles = startCycles;
+
+    //fprintf(stderr, "here\n");
+	while (cycles < endCycles) {
+		cycles = nv_getticks();
+        _mm_pause();
+	}
+	_mm_sfence();
+#else
+	uintptr_t p;
+
+	for (p = (uintptr_t)addr & ~(CACHE_LINE_SIZE - 1); p < (uintptr_t)addr + sz; p += CACHE_LINE_SIZE) {
+		_mm_clflush((void*)p);
+	}
+#endif
+}
+
+static inline void write_data_nowait(void* addr, size_t sz) {
+#ifdef SIMULATE_LATENCIES
+	//this might just take a few cycles if we are not waiting for the op to complete
+	//just reading rdtsc may take a few tens of cycles
+	//so perhaps better to just do a pause
+	if (WRITE_DATA_NOWAIT_DELAY < 10) {
+		_mm_pause();
+	}
+	else {
+		uint64_t startCycles = nv_getticks();
+		uint64_t endCycles = startCycles + WRITE_DATA_NOWAIT_DELAY;
+		uint64_t cycles = startCycles;
+
+		while (cycles < endCycles) {
+			cycles = nv_getticks();
+		}
+	}
+#else
+	write_data_wait(addr, sz);
+#endif
+}
+#endif
+
+
 JEMALLOC_INLINE void
 tcache_flush(void)
 {
@@ -303,6 +452,9 @@ tcache_alloc_easy(tcache_bin_t *tbin, bool *tcache_success)
 	*tcache_success = true;
 	ret = *(tbin->avail - tbin->ncached);
 	tbin->ncached--;
+
+	write_data_nowait((void*)(tbin->avail - tbin->ncached), 1);
+    write_data_nowait((void*)&(tbin->ncached), 1);
 
 	if (unlikely((int)tbin->ncached < tbin->low_water))
 		tbin->low_water = tbin->ncached;
@@ -473,8 +625,11 @@ tcache_dalloc_small(tsd_t *tsd, tcache_t *tcache, void *ptr, szind_t binind,
 		    (tbin_info->ncached_max >> 1));
 	}
 	assert(tbin->ncached < tbin_info->ncached_max);
+
 	tbin->ncached++;
 	*(tbin->avail - tbin->ncached) = ptr;
+	write_data_nowait((void*)(tbin->avail - tbin->ncached), 1);
+    write_data_nowait((void*)&(tbin->ncached), 1);
 
 	tcache_event(tsd, tcache);
 }
@@ -505,6 +660,8 @@ tcache_dalloc_large(tsd_t *tsd, tcache_t *tcache, void *ptr, size_t size,
 	tbin->ncached++;
 	*(tbin->avail - tbin->ncached) = ptr;
 
+	write_data_nowait((void*)(tbin->avail - tbin->ncached), 1);
+    write_data_nowait((void*)&(tbin->ncached), 1);
 	tcache_event(tsd, tcache);
 }
 

@@ -1,6 +1,154 @@
 #define	JEMALLOC_ARENA_C_
 #include "jemalloc/internal/jemalloc_internal.h"
 
+
+/*#define SIMULATE_LATENCIES 1*/
+
+/*#define WAIT_WRITES_DELAY 370*/
+/*#define WRITE_DATA_WAIT_DELAY 370*/
+/*#define WRITE_DATA_NOWAIT_DELAY 9*/
+
+
+/*#ifndef CACHE_LINE_SIZE*/
+/*#define CACHE_LINE_SIZE 64*/
+/*#endif*/
+
+/*#define CACHE_ALIGNED __attribute__ ((aligned(CACHE_LINE_SIZE)))*/
+
+
+/*#ifndef EPOCH_CACHE_LINE_SIZE*/
+/*#define EPOCH_CACHE_LINE_SIZE 64*/
+/*#endif*/
+
+/*#define EPOCH_CACHE_ALIGNED __attribute__ ((aligned(EPOCH_CACHE_LINE_SIZE)))*/
+
+/*#if !defined(UNUSED)*/
+/*#define UNUSED __attribute__ ((unused))*/
+/*#endif*/
+
+/*#ifdef __SSE__*/
+/*#include <xmmintrin.h>*/
+/*#endif*/
+
+/*#include <stdint.h>*/
+
+/*typedef uint64_t ticks;*/
+
+
+/*static inline ticks*/
+/*nv_getticks(void)*/
+/*{*/
+  /*unsigned hi, lo;*/
+  /*__asm__ __volatile__ ("rdtsc" : "=a"(lo), "=d"(hi));*/
+  /*return ( (unsigned long long)lo)|( ((unsigned long long)hi)<<32 );*/
+/*}*/
+
+/*[> contains functions for working with non-volatile memory <]*/
+
+
+/*// TODO add operations to do moves from volatile memory to persistent memeory addresses using non-temporal stores*/
+/*// for examples, see https://github.com/pmem/nvml/blob/master/src/libpmem/pmem.c*/
+
+
+
+/*static inline size_t num_cache_lines(size_t size_bytes) {*/
+	/*if (size_bytes == 0) return 0;*/
+	/*return (((size_bytes - 1)/ CACHE_LINE_SIZE) + 1);*/
+/*}*/
+
+/*#ifdef NEW_INTEL_INSTRUCTIONS*/
+
+/*#define _mm_clflushopt(addr) asm volatile(".byte 0x66; clflush %0" : "+m" (*(volatile char *)addr));*/
+/*#define _mm_clwb(addr) asm volatile(".byte 0x66; xsaveopt %0" : "+m" (*(volatile char *)addr));*/
+
+/*static inline void wait_writes() {*/
+	/*_mm_sfence();*/
+/*}*/
+
+/*static inline void write_data_nowait(void* addr, size_t sz) {*/
+	/*uintptr_t p;*/
+
+	/*for (p = (uintptr_t)adddr & ~(CACHE_LINE_SIZE - 1; p < (uintptr_t)addr + sz; p += CACHE_LINE_SIZE) {*/
+		/*_mm_clwb((void*)p);*/
+	/*}*/
+/*}*/
+
+/*static inline void write_data_wait(void* addr, size_t sz) {*/
+	/*uintptr_t p;*/
+
+		/*for (p = (uintptr_t)adddr & ~(CACHE_LINE_SIZE - 1; p < (uintptr_t)addr + sz; p += CACHE_LINE_SIZE) {*/
+			/*_mm_clwb((void*)p);*/
+		/*}*/
+	/*_mm_sfence();*/
+/*}*/
+
+/*#else*/
+
+/*#define _mm_clflushopt(addr) _mm_clflush(addr)*/
+/*#define _mm_clwb(addr) _mm_clflush(addr)*/
+
+
+/*static inline void wait_writes() {*/
+/*#ifdef SIMULATE_LATENCIES*/
+	/*uint64_t startCycles = nv_getticks();*/
+	/*uint64_t endCycles = startCycles + WAIT_WRITES_DELAY;*/
+	/*uint64_t cycles = startCycles;*/
+
+	/*while (cycles < endCycles) {*/
+		/*cycles = nv_getticks();*/
+	/*}*/
+	/*_mm_sfence();*/
+/*#else*/
+	/*//_mm_sfence();*/
+/*#endif*/
+/*}*/
+
+/*//size is in terms of number of cache lines*/
+/*static inline void write_data_wait(void* addr, size_t sz) {*/
+/*#ifdef SIMULATE_LATENCIES*/
+	/*uint64_t startCycles =nv_getticks();*/
+	/*uint64_t endCycles = startCycles + WRITE_DATA_WAIT_DELAY;*/
+	/*uint64_t cycles = startCycles;*/
+
+    /*//fprintf(stderr, "here\n");*/
+	/*while (cycles < endCycles) {*/
+		/*cycles = nv_getticks();*/
+        /*_mm_pause();*/
+	/*}*/
+	/*_mm_sfence();*/
+/*#else*/
+	/*uintptr_t p;*/
+
+	/*for (p = (uintptr_t)addr & ~(CACHE_LINE_SIZE - 1); p < (uintptr_t)addr + sz; p += CACHE_LINE_SIZE) {*/
+		/*_mm_clflush((void*)p);*/
+	/*}*/
+/*#endif*/
+/*}*/
+
+/*static inline void write_data_nowait(void* addr, size_t sz) {*/
+/*#ifdef SIMULATE_LATENCIES*/
+	/*//this might just take a few cycles if we are not waiting for the op to complete*/
+	/*//just reading rdtsc may take a few tens of cycles*/
+	/*//so perhaps better to just do a pause*/
+	/*if (WRITE_DATA_NOWAIT_DELAY < 10) {*/
+		/*_mm_pause();*/
+	/*}*/
+	/*else {*/
+		/*uint64_t startCycles = nv_getticks();*/
+		/*uint64_t endCycles = startCycles + WRITE_DATA_NOWAIT_DELAY;*/
+		/*uint64_t cycles = startCycles;*/
+
+		/*while (cycles < endCycles) {*/
+			/*cycles = nv_getticks();*/
+		/*}*/
+	/*}*/
+/*#else*/
+	/*write_data_wait(addr, sz);*/
+/*#endif*/
+/*}*/
+/*#endif*/
+
+
 /******************************************************************************/
 /* Data. */
 
@@ -135,6 +283,7 @@ arena_slab_reg_alloc(tsdn_t *tsdn, extent_t *slab,
 	ret = (void *)((uintptr_t)extent_addr_get(slab) +
 	    (uintptr_t)(bin_info->reg_size * regind));
 	slab_data->nfree--;
+    write_data_wait((void*)&slab_data->nfree, 1);
 	return (ret);
 }
 
@@ -1025,6 +1174,7 @@ arena_bin_malloc_hard(tsdn_t *tsdn, arena_t *arena, arena_bin_t *bin,
 	bin_info = &arena_bin_info[binind];
 	if (bin->slabcur != NULL) {
 		arena_bin_slabs_full_insert(bin, bin->slabcur);
+        write_data_wait((void*)bin, num_cache_lines(sizeof(arena_bin_t)));
 		bin->slabcur = NULL;
 	}
 	slab = arena_bin_nonfull_slab_get(tsdn, arena, bin, binind);
@@ -1054,6 +1204,8 @@ arena_bin_malloc_hard(tsdn_t *tsdn, arena_t *arena, arena_bin_t *bin,
 					arena_bin_lower_slab(tsdn, arena, slab,
 					    bin);
 				}
+                write_data_nowait((void*)slab, num_cache_lines(sizeof(extent_t)));
+                write_data_wait((void*)bin, num_cache_lines(sizeof(arena_bin_t)));
 			}
 			return (ret);
 		}
@@ -1066,6 +1218,7 @@ arena_bin_malloc_hard(tsdn_t *tsdn, arena_t *arena, arena_bin_t *bin,
 		return (NULL);
 	bin->slabcur = slab;
 
+    write_data_wait((void*)bin, num_cache_lines(sizeof(arena_bin_t)));
 	assert(extent_slab_data_get(bin->slabcur)->nfree > 0);
 
 	return (arena_slab_reg_alloc(tsdn, slab, bin_info));
@@ -1104,6 +1257,7 @@ arena_tcache_fill_small(tsdn_t *tsdn, arena_t *arena, tcache_bin_t *tbin,
 				memmove(tbin->avail - i, tbin->avail - nfill,
 				    i * sizeof(void *));
 			}
+            write_data_wait((void*) tbin->avail-i, num_cache_lines(i*sizeof(void*)));
 			break;
 		}
 		if (config_fill && unlikely(opt_junk_alloc)) {
@@ -1122,6 +1276,7 @@ arena_tcache_fill_small(tsdn_t *tsdn, arena_t *arena, tcache_bin_t *tbin,
 	}
 	malloc_mutex_unlock(tsdn, &bin->lock);
 	tbin->ncached = i;
+    write_data_wait((void*)&tbin->ncached, 1);
 	arena_decay_tick(tsdn, arena);
 }
 
@@ -1129,8 +1284,10 @@ void
 arena_alloc_junk_small(void *ptr, const arena_bin_info_t *bin_info, bool zero)
 {
 
-	if (!zero)
+	if (!zero) {
 		memset(ptr, JEMALLOC_ALLOC_JUNK, bin_info->reg_size);
+        write_data_wait(ptr, num_cache_lines(bin_info->reg_size));
+    }
 }
 
 #ifdef JEMALLOC_JET

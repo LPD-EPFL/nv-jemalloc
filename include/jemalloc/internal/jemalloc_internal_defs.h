@@ -219,7 +219,7 @@
  * JEMALLOC_IVSALLOC enables ivsalloc(), which verifies that pointers reside
  * within jemalloc-owned extents before dereferencing them.
  */
-/* #undef JEMALLOC_IVSALLOC */
+#define JEMALLOC_IVSALLOC 
 
 /*
  * If defined, explicitly attempt to more uniformly distribute large allocation
